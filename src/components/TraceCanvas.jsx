@@ -7,7 +7,6 @@ import { letterGuide, trackWidths } from '../lib/letterGuide';
 // letter has been coloured in. Once enough is covered the letter is complete.
 
 const COMPLETE_AT = 0.8; // fraction of the letter that must be coloured
-const STROKE_DONE_AT = 0.8; // fraction of each stroke's dots that must be passed (every dot to tap)
 const TRACK_EXTRA = 0.02; // every letter is drawn a little bolder (fraction of font size)
 // Pen colours: the multi-colour pen (the default) is last.
 const CRAYONS = [
@@ -70,33 +69,25 @@ function along(pts, step) {
   return out;
 }
 
-// How closely the child's lines followed the letter's path, 0–100, and 1–3 stars.
-// Two parts: how much of what they drew sits on the path (wobbles and wandering
-// count against it), and how much of the path their lines went along.
-function scoreTrace(ink, guide, width, pen) {
+// Stars: how much of the child's drawing sits on top of the dashed path, 0–100,
+// and 1–3 stars. Wobbles and lines away from the path count against it.
+function scoreTrace(ink, guide, near) {
   const lines = guide.strokes.filter((g) => !g.tap).map((g) => g.points);
   if (!lines.length) return { score: 100, stars: 3 };
-  // right on the line: within about a pen's width; nothing for wandering near the edge of the letter
-  const close = Math.max(pen * 1.1, width * 0.1), far = Math.max(close * 2, Math.min(width * 0.42, pen * 2.6));
+  const close = near, far = near * 2.4;
   const drawn = ink.flatMap((l) => along(l, 3));
   let onPath = 0;
   for (const p of drawn) {
     const d = Math.min(...lines.map((l) => distToLine(p, l)));
     onPath += d <= close ? 1 : d >= far ? 0 : (far - d) / (far - close);
   }
-  const accuracy = drawn.length ? onPath / drawn.length : 0;
-  const path = lines.flatMap((l) => along(l, 6));
-  const inkLines = ink.filter((l) => l.length);
-  let covered = 0;
-  for (const p of path) if (inkLines.some((l) => distToLine(p, l) <= Math.max(pen * 2, width * 0.25))) covered++;
-  const coverage = path.length ? covered / path.length : 1;
-  const score = Math.round(100 * (0.6 * accuracy + 0.4 * coverage));
-  if (window.__debugGuide) window.__score = { accuracy, coverage, width, pen, close, far };
+  const score = Math.round(100 * (drawn.length ? onPath / drawn.length : 0));
+  if (window.__debugGuide) window.__score = { score, close, far };
   return { score, stars: score >= 80 ? 3 : score >= 60 ? 2 : 1 };
 }
 
 // The letter's path as a dashed line (with a light edge so it shows on any colour).
-function drawPath(ctx, guide, S, theme, taps = true) {
+function drawPath(ctx, guide, S, theme, taps = true, band = false) {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -114,11 +105,17 @@ function drawPath(ctx, guide, S, theme, taps = true) {
     ctx.beginPath();
     pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
     ctx.setLineDash([]);
-    ctx.lineWidth = Math.max(5, S * 0.02);
-    ctx.strokeStyle = 'rgba(255,255,255,.9)';
+    if (band) {
+      // a soft band under the dashes, so the path reads as a road to follow
+      ctx.lineWidth = Math.max(14, S * 0.06);
+      ctx.strokeStyle = theme.soft;
+      ctx.stroke();
+    }
+    ctx.lineWidth = Math.max(7, S * 0.028);
+    ctx.strokeStyle = 'rgba(255,255,255,.95)';
     ctx.stroke();
-    ctx.setLineDash([Math.max(7, S * 0.03), Math.max(6, S * 0.024)]);
-    ctx.lineWidth = Math.max(3, S * 0.011);
+    ctx.setLineDash([Math.max(9, S * 0.036), Math.max(7, S * 0.026)]);
+    ctx.lineWidth = Math.max(4, S * 0.016);
     ctx.strokeStyle = theme.deep;
     ctx.stroke();
   }
@@ -153,44 +150,25 @@ function penFill(ctx, pen, x, y) {
   return g;
 }
 
-// Of neighbouring dots along each stroke that were both passed, the share passed
-// in writing order – low when strokes are traced backwards.
-function forwardShare(s) {
-  let pairs = 0, fwd = 0;
-  for (let i = 1; i < s.seq.length; i++) {
-    if (s.seq[i].si !== s.seq[i - 1].si || !s.hit[i] || !s.hit[i - 1]) continue;
-    pairs++;
-    if (s.hit[i] > s.hit[i - 1]) fwd++;
-  }
-  return pairs ? fwd / pairs : 1;
-}
-
-// Every stroke traced: most of each line's dots passed, and every dot tapped.
-function everyStrokeDone(s) {
+// Every stroke traced from end to end: the child's lines cover the whole dashed
+// line of each stroke (only tiny gaps allowed), and every dot is tapped.
+function fullyTraced(s) {
   return s.guide.strokes.every((g, si) => {
-    const from = s.startIdx[si], n = g.dots.length;
-    let hit = 0;
-    for (let i = from; i < from + n; i++) if (s.hit[i]) hit++;
-    return g.tap ? hit === n : hit >= Math.ceil(n * STROKE_DONE_AT);
+    if (g.tap) return !!s.tapped[si];
+    const [from, to] = s.pathRange[si];
+    let gap = 0;
+    for (let i = from; i < to; i++) {
+      gap = s.cov[i] ? 0 : gap + 3;
+      if (gap > s.maxGap) return false;
+    }
+    return true;
   });
 }
 
-// Dots passed going the right way (a stroke's start, or right after the dot
-// before it) – what the progress meter shows.
-function forwardDots(s) {
-  let n = 0;
-  for (let i = 0; i < s.seq.length; i++) {
-    if (!s.hit[i]) continue;
-    const start = i === 0 || s.seq[i].si !== s.seq[i - 1].si;
-    if (start || (s.hit[i - 1] && s.hit[i - 1] < s.hit[i])) n++;
-  }
-  return n;
-}
-
-// While tracing: the letter's path as a dashed line, and a dot in the pen's
-// colour where it finishes (reaching it completes the letter).
-function drawGuide(ctx, guide, S, theme, pen = '#222222', end = null) {
-  drawPath(ctx, guide, S, theme, false);
+// While tracing: the letter's path as a thick dashed line, and a dot in the
+// pen's colour where it ends.
+function drawGuide(ctx, guide, S, theme, pen = '#222222', end = null, band = false) {
+  drawPath(ctx, guide, S, theme, false, band);
   if (!end || end.tap) return; // a final tap is already marked by its ring
   const r = Math.max(6, S * 0.024);
   ctx.save();
@@ -332,29 +310,32 @@ export default function TraceCanvas({ char, font, theme, onComplete, reference =
     const ctx = canvas.getContext('2d');
     const { S, dpr, glyph } = s;
 
-    // Paint clipped to the letter shape.
+    // Letters without a guide are coloured in: paint clipped to the letter shape.
     const lc = s.layer.getContext('2d');
     lc.globalCompositeOperation = 'copy';
     lc.drawImage(s.paint, 0, 0);
-    lc.globalCompositeOperation = 'destination-in';
-    lc.drawImage(s.mask, 0, 0);
+    if (!s.guide) {
+      lc.globalCompositeOperation = 'destination-in';
+      lc.drawImage(s.mask, 0, 0);
+    }
     lc.globalCompositeOperation = 'source-over';
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, S, S);
-    // The letter is a solid "track" with a bold border and a dotted
-    // centre line to follow; the child's crayon goes on top.
-    // Once a guided letter is done, only the child's own drawing is shown.
-    if (!(s.guide && s.finished)) {
+    // The letter shape is a hint: shown before the child starts and while
+    // "Show me" plays. While tracing, only the dashed path is shown; once done,
+    // only the child's own drawing.
+    const hint = !s.guide || (!s.finished && (s.demo || !s.started?.any));
+    if (hint) {
       const outline = Math.max(3, S * 0.014 * outlineScale);
       drawShape(ctx, char, glyph, glyph.thick + outline * 2, theme.deep);
       drawShape(ctx, char, glyph, glyph.thick, theme.soft);
     }
-    if (s.guide && !s.finished) drawGuide(ctx, s.guide, S, theme, crayonRef.current, s.finishAt);
+    if (s.guide && !s.finished) drawGuide(ctx, s.guide, S, theme, crayonRef.current, s.finishAt, !hint);
     if (s.demo) drawDemo(ctx, s, theme);
     ctx.drawImage(s.layer, 0, 0, S, S);
     // Start markers stay visible on top of the crayon until the letter is done.
-    if (s.guide && !s.finished) drawStarts(ctx, s.guide, S, s.startIdx, s.hit);
+    if (s.guide && !s.finished) drawStarts(ctx, s.guide, S, s.guide.strokes.map((_, i) => i), s.started);
   }, [char, theme, outlineScale]);
 
   // Redraw when a new pen colour is picked (the next dot shows it).
@@ -466,27 +447,31 @@ export default function TraceCanvas({ char, font, theme, onComplete, reference =
         pc.lineCap = 'round';
         pc.lineJoin = 'round';
 
-        // Every guide dot in writing order: the child completes the letter by
-        // reaching them one after another (starting each stroke at its start).
-        const seq = [], startIdx = [];
+        // Points every 3px along each stroke's dashed line: the letter is done
+        // when the child's lines have covered them all (and tapped every dot).
+        const pathPts = [], pathRange = [];
         guide?.strokes.forEach((g, si) => {
-          startIdx[si] = seq.length;
-          g.dots.forEach((d) => seq.push({ x: d.x, y: d.y, si, tap: !!g.tap }));
+          const from = pathPts.length;
+          if (!g.tap) along(g.points, 3).forEach((q) => pathPts.push(q));
+          pathRange[si] = [from, pathPts.length];
         });
 
         st.current = {
-          S, dpr, W, glyph, mask, paint, samples, guide, seq, startIdx,
+          S, dpr, W, glyph, mask, paint, samples, guide, pathPts, pathRange,
           brush, // width of the letter's track (for how close is "on" the path)
           // tracing pen: a thin line so the path and dots stay visible
           // (letters without a guide keep the wide crayon and the colour-in rule)
           pen: guide ? Math.max(3, S * 0.02 * penScale) : brush,
-          hit: new Uint32Array(seq.length), // when each guide dot was passed (0 = not yet)
-          along: (startIdx[startIdx.length - 1] ?? 0) - 1, // how far along the last stroke the finger has come
+          cov: new Uint8Array(pathPts.length), // which path points the child's lines have covered
+          covN: 0,
+          tapped: [], // dots tapped, by stroke
+          started: [], // strokes begun (their start marker is then hidden)
+          near: Math.max(S * 0.03, S * 0.02 * penScale), // right on the dashed line (for the stars)
+          cover: Math.max(S * 0.03, brush * 0.45), // close enough to count the path as traced
+          maxGap: S * 0.04, // the biggest gap still counted as traced (joined up when done)
           // the finish: the very end of the last stroke (or the last dot to tap)
           finishAt: guide?.strokes.length ? { ...guide.strokes.at(-1).points.at(-1), tap: !!guide.strokes.at(-1).tap } : null,
-          tick: 0,
-          hits: 0,
-          reach: Math.max(brush * 0.5, 14), // how close the finger must pass to a dot
+          reach: Math.max(brush * 0.5, 14), // how close the finger must pass to a dot to tap it
           maskData: data, // letter shape, to notice when the finger leaves the letter
           layer: makeCanvas(W, W),
           hue: Math.floor(Math.random() * 360),
@@ -523,7 +508,7 @@ export default function TraceCanvas({ char, font, theme, onComplete, reference =
     const pc = s.paint.getContext('2d');
     if (s.guide) {
       // Keep the child's own lines and score them against the letter's path.
-      const result = scoreTrace(s.ink, s.guide, s.brush, s.pen);
+      const result = scoreTrace(s.ink, s.guide, s.near);
       s.result = result;
       // Close short gaps (a stroke begun a little late or lifted just before its
       // end, a missed corner) along the path, joined onto the child's own line, so
@@ -608,50 +593,44 @@ export default function TraceCanvas({ char, font, theme, onComplete, reference =
     [measureCoverage, finish],
   );
 
-  // Tick off the guide dots the finger passes. Reaching the last dot finishes
-  // the letter once most of the path has been traced; wobbles and small
-  // mistakes are allowed and show up in the stars instead.
+  // Mark the bits of the dashed path the finger's line covers, and dots tapped.
+  // The letter is done once every stroke is covered from end to end.
   const [progress, setProgress] = useState(0);
   const advance = (a, b) => {
     const s = st.current;
-    if (!s.seq?.length || s.finished) return;
-    // Moves outside the letter don't count (no sweeping across everything);
-    // counting picks up again as soon as the finger is back on the letter.
-    const off = (q) =>
-      [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dy]) => {
-        const x = Math.round((q.x + dx * s.brush * 0.3) * s.dpr), y = Math.round((q.y + dy * s.brush * 0.3) * s.dpr);
-        return x < 0 || y < 0 || x >= s.W || y >= s.W || s.maskData[(y * s.W + x) * 4 + 3] < 100;
-      });
-    if (off(a) || off(b)) return;
-    const before = s.hits;
-    // dots passed in this move, in the order the finger reached them
-    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy || 1;
-    s.seq
-      .map((d, i) => ({ i, t: ((d.x - a.x) * dx + (d.y - a.y) * dy) / l2 }))
-      .filter(({ i }) => !s.hit[i] && distToSegment(s.seq[i], a, b) <= s.reach)
-      .sort((p, q) => p.t - q.t)
-      .forEach(({ i }) => {
-        s.hit[i] = ++s.tick; // when it was passed, to tell the direction of travel
-        s.hits++;
-      });
-    if (s.hits !== before) setProgress(forwardDots(s) / s.seq.length);
-    const last = s.seq.length - 1;
-    // The last stroke is followed from its start: the finger's place along it moves
-    // on as it passes the next few dots (a couple may be missed), so passing near
-    // its end from somewhere else (a loop, a crossing stroke) doesn't count.
-    const first = s.startIdx[s.seq[last].si];
-    for (;;) {
-      let to = -1;
-      for (let k = s.along + 1; k <= Math.min(last, s.along + 3); k++) if (distToSegment(s.seq[k], a, b) <= s.reach) to = k;
-      if (to < 0) break;
-      s.along = to;
+    if (!s.pathRange || s.finished) return;
+    const before = s.covN;
+    // A path point counts when the line passes beside it (within the letter's
+    // width), or right over it – not when the finger merely stopped short nearby.
+    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+    for (let i = 0; i < s.pathPts.length; i++) {
+      if (s.cov[i]) continue;
+      const q = s.pathPts[i];
+      const t = l2 ? ((q.x - a.x) * dx + (q.y - a.y) * dy) / l2 : -1;
+      const d = distToSegment(q, a, b);
+      if (t > 0 && t < 1 ? d <= s.cover : d <= s.near) {
+        s.cov[i] = 1;
+        s.covN++;
+      }
     }
-    // the finish: the end of the last stroke (or its dot to tap), reached along the stroke
-    const atEnd = s.finishAt.tap || first === last
-      ? distToSegment(s.seq[last], a, b) <= s.reach
-      : s.along >= last - 2 && distToSegment(s.finishAt, a, b) <= Math.max(10, s.reach * 0.5);
-    if (atEnd) s.reachedEnd = true; // remembered, so going back for a skipped stroke then finishes it
-    if (s.reachedEnd && everyStrokeDone(s) && forwardShare(s) >= 0.6) finish();
+    let tapsBefore = s.tapped.filter(Boolean).length;
+    s.guide.strokes.forEach((g, si) => {
+      if (g.tap && !s.tapped[si] && distToSegment(g.points[0], a, b) <= s.reach) s.tapped[si] = true;
+      const [from, to] = s.pathRange[si];
+      if (!s.started[si] && (g.tap ? s.tapped[si] : s.cov[from] || s.cov[Math.min(to - 1, from + 3)])) s.started[si] = true;
+    });
+    const taps = s.guide.strokes.filter((g) => g.tap).length;
+    const tapsNow = s.tapped.filter(Boolean).length;
+    if (s.covN !== before || tapsNow !== tapsBefore) setProgress((s.covN + tapsNow) / (s.pathPts.length + taps || 1));
+    // Done when fully traced – and it was traced, not scribbled: at least
+    // 40% of the drawing must sit on the path (checked a few times a second).
+    if (fullyTraced(s)) {
+      const now = performance.now();
+      if (now - (s.lastScore || 0) > 250) {
+        s.lastScore = now;
+        if (scoreTrace(s.ink, s.guide, s.near).score >= 40) finish();
+      }
+    }
   };
 
   const colorFor = () => {
@@ -709,6 +688,7 @@ export default function TraceCanvas({ char, font, theme, onComplete, reference =
     canvasRef.current.setPointerCapture?.(e.pointerId);
     const p = point(e);
     s.last = p;
+    s.started.any = true;
     s.ink.push([p]);
     const pc = s.paint.getContext('2d');
     pc.fillStyle = colorFor();
@@ -738,16 +718,18 @@ export default function TraceCanvas({ char, font, theme, onComplete, reference =
       s.last = p;
     }
     render();
-    if (!s.seq?.length) check(false); // no guide: fall back to how much is coloured
+    if (!s.guide) check(false); // no guide: fall back to how much is coloured
   };
 
   const onUp = () => {
     const s = st.current;
     if (!s.last) return;
+    s.lastScore = 0; // re-check right away on lifting the finger
+    advance(s.last, s.last);
     s.last = null;
     if (!s.finished) {
       sfx.pop();
-      if (!s.seq?.length) check(true);
+      if (!s.guide) check(true);
     }
   };
 
@@ -755,18 +737,17 @@ export default function TraceCanvas({ char, font, theme, onComplete, reference =
     const s = st.current;
     if (!s.paint || s.finished) return;
     s.paint.getContext('2d').clearRect(0, 0, s.S, s.S);
-    s.hit = new Uint32Array(s.seq?.length || 0);
-    s.along = (s.startIdx?.at(-1) ?? 0) - 1;
-    s.reachedEnd = false;
-    s.tick = 0;
-    s.hits = 0;
+    s.cov = new Uint8Array(s.pathPts?.length || 0);
+    s.covN = 0;
+    s.tapped = [];
+    s.started = [];
     s.ink = [];
     render();
     setCoverage(0);
     setProgress(0);
   };
 
-  const usesDots = !!st.current.seq?.length;
+  const usesDots = !!st.current.guide;
   const pct = usesDots ? Math.round(progress * 100) : Math.min(100, Math.round((coverage / COMPLETE_AT) * 100));
 
   return (
