@@ -1,4 +1,4 @@
-# Generates English and Arabic letter clips with Google Translate's text-to-speech
+# Generates English and Arabic letter clips and the 0–9 number clips with Google Translate's text-to-speech
 # voice (female), trims silence and evens out the volume with ffmpeg.
 #   python3 scripts/make_letter_audio_google.py            # missing clips only
 #   python3 scripts/make_letter_audio_google.py --force    # regenerate all
@@ -53,3 +53,21 @@ def run(lang, items):
 
 run('en', [(i, f'{i.upper()}. {i.upper()} is for {w}.') for i, w in ENGLISH])
 run('ar', [(i, f'{name}. {word}') for i, name, word in ARABIC])
+
+
+NUMBERS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine']
+
+def run_numbers():
+    folder = ROOT / 'num'
+    folder.mkdir(parents=True, exist_ok=True)
+    for n, name in enumerate(NUMBERS):
+        out = folder / f'{n}.mp3'
+        if out.exists() and not FORCE:
+            continue
+        word = 'No apples' if n == 0 else f"{name} apple{'' if n == 1 else 's'}"
+        tts(f'{name}. {word}.', 'en', out)
+        print(f'  {out.relative_to(ROOT.parent.parent.parent)}  «{name}. {word}.»')
+        time.sleep(0.4)
+
+
+run_numbers()

@@ -97,7 +97,7 @@ export default function Quiz({ langId, progress, onFinish, onExit }) {
       {!finished && (
         <>
           <div className="card quiz-prompt" key={`p-${seed}-${i}`}>
-            <p className="quiz-q">Which letter is this?</p>
+            <p className="quiz-q">Which {a.unit || 'letter'} is this?</p>
             <button className="listen-btn" onClick={() => playLetter(a, round.answer, { withWord: false })}>
               🔊
             </button>

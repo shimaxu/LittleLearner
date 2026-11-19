@@ -23,7 +23,7 @@ export default function LetterMap({ langId, progress, onBack, onLearn, onQuiz, o
           <div className="bar-fill" style={{ width: `${pct}%` }} />
         </div>
         <p className="map-sub">
-          {done.size} of {a.letters.length} letters traced
+          {done.size} of {a.letters.length} {a.unit || 'letter'}s traced
           {starTotal > 0 && <> · ★ {starTotal} of {a.letters.length * 3} stars</>}
           {progress[langId].quizBest > 0 && <> · Quiz best {progress[langId].quizBest}%</>}
         </p>

@@ -44,7 +44,7 @@ export default function Learn({ langId, startIndex, progress, onComplete, onExit
   return (
     <div className="screen learn" style={style}>
       <TopBar onBack={onExit} title={`${a.title} · ${index + 1} / ${a.letters.length}`} theme={a.theme}>
-        <button className="icon-btn" aria-label="Hear the letter" onClick={() => playLetter(a, letter)}>
+        <button className="icon-btn" aria-label={`Hear the ${a.unit || 'letter'}`} onClick={() => playLetter(a, letter)}>
           🔊
         </button>
       </TopBar>
@@ -65,12 +65,14 @@ export default function Learn({ langId, startIndex, progress, onComplete, onExit
             {letter.lower && <span className="intro-lower">{letter.lower}</span>}
           </button>
           <h2 className="intro-name">{letter.name}</h2>
-          <p className="intro-sound">
-            says <b>“{letter.sound}”</b>
-          </p>
+          {letter.sound && (
+            <p className="intro-sound">
+              says <b>“{letter.sound}”</b>
+            </p>
+          )}
           {letter.emoji && (
             <button className="intro-word" onClick={() => playLetter(a, letter)}>
-              <span className="intro-emoji">{letter.emoji}</span>
+              <span className={`intro-emoji ${[...letter.emoji].length > 3 ? 'is-count' : ''}`}>{letter.emoji}</span>
               <span>
                 {letter.word && letter.wordLatin ? (
                   <>
@@ -153,13 +155,13 @@ export default function Learn({ langId, startIndex, progress, onComplete, onExit
                   </button>
                 ) : (
                   <button className="btn btn-main btn-big" onClick={() => goTo(index + 1)}>
-                    Next letter →
+                    Next {a.unit || 'letter'} →
                   </button>
                 )}
               </div>
               {isLast && (
                 <button className="link-btn" onClick={onExit}>
-                  Back to letters
+                  Back to {a.unit || 'letter'}s
                 </button>
               )}
             </div>

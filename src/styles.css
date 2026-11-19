@@ -195,6 +195,8 @@ h1, h2, p { margin: 0; }
   border-radius: 20px; padding: 10px 18px; text-align: start;
 }
 .intro-emoji { font-size: 2.6rem; }
+/* counting apples for numbers: smaller, and wrapping onto a second row */
+.intro-emoji.is-count { font-size: 1.5rem; max-width: 9.5em; line-height: 1.25; text-align: center; overflow-wrap: anywhere; }
 .intro-word > span:last-child { display: flex; flex-direction: column; }
 .intro-word-native { font-size: 1.5rem; font-weight: 600; }
 .intro-word small { color: var(--muted); font-size: .95rem; }

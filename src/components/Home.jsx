@@ -53,7 +53,7 @@ export default function Home({ profile, progress, onOpen, onQuiz, onSwitch, onPa
                     {a.nativeTitle}
                   </p>
                   <p className="lang-count">
-                    {p.done.length} / {a.letters.length} letters
+                    {p.done.length} / {a.letters.length} {a.unit || 'letter'}s
                   </p>
                 </div>
                 <ProgressRing percent={pct} color={a.theme.main} />

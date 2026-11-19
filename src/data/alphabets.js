@@ -547,6 +547,37 @@ const arabic = [
   ...(char === 'ي' ? { font: '"Noto Sans Arabic", sans-serif' } : {}),
 }));
 
+// Numbers 0–9 (Fredoka, like English). Hand-drawn tracing paths, fractions of the
+// digit's ink box, all starting at the top in the usual writing order:
+// 0 round to the left and back to the top · 1 up the flag, then down ·
+// 2 over the top, down the slope, along the bottom · 3 two bumps, touching the
+// middle · 4 down the slope and across, then the tall line · 5 down and round
+// the belly, then the top bar · 6 down the curve and round the loop ·
+// 7 across the top and down · 8 an S down and back up to the top ·
+// 9 round the head to the left, then down the tail.
+const NUMBER_GUIDES = {
+  '0': [[[0.5, 0.055], [0.305, 0.115], [0.162, 0.278], [0.11, 0.5], [0.162, 0.723], [0.305, 0.885], [0.5, 0.945], [0.695, 0.885], [0.838, 0.723], [0.89, 0.5], [0.838, 0.277], [0.695, 0.115], [0.5, 0.055]]],
+  '1': [[[0.08, 0.33], [0.3, 0.24], [0.55, 0.14], [0.8, 0.05], [0.88, 0.12], [0.88, 0.4], [0.88, 0.7], [0.88, 0.95]]],
+  '2': [[[0.1, 0.36], [0.12, 0.2], [0.25, 0.08], [0.48, 0.05], [0.7, 0.09], [0.81, 0.25], [0.77, 0.42], [0.6, 0.58], [0.35, 0.75], [0.1, 0.92], [0.3, 0.93], [0.6, 0.93], [0.95, 0.93]]],
+  '3': [[[0.12, 0.2], [0.25, 0.07], [0.5, 0.04], [0.72, 0.1], [0.8, 0.25], [0.72, 0.4], [0.58, 0.47], [0.45, 0.47], [0.62, 0.5], [0.82, 0.6], [0.88, 0.77], [0.76, 0.91], [0.52, 0.96], [0.3, 0.93], [0.12, 0.8]]],
+  '4': [[[0.33, 0.04], [0.2, 0.33], [0.07, 0.625], [0.4, 0.625], [0.78, 0.625]], [[0.9, 0.04], [0.9, 0.5], [0.9, 0.96]]],
+  '5': [[[0.22, 0.05], [0.18, 0.25], [0.13, 0.48], [0.3, 0.41], [0.5, 0.39], [0.75, 0.45], [0.88, 0.62], [0.85, 0.8], [0.7, 0.93], [0.45, 0.96], [0.2, 0.92], [0.07, 0.84]], [[0.22, 0.05], [0.55, 0.05], [0.9, 0.05]]],
+  '6': [[[0.85, 0.05], [0.6, 0.06], [0.35, 0.15], [0.15, 0.35], [0.08, 0.6], [0.12, 0.8], [0.3, 0.95], [0.55, 0.96], [0.78, 0.88], [0.9, 0.68], [0.82, 0.52], [0.6, 0.45], [0.35, 0.47], [0.12, 0.58]]],
+  '7': [[[0.05, 0.055], [0.5, 0.055], [0.88, 0.06], [0.75, 0.3], [0.6, 0.55], [0.45, 0.78], [0.37, 0.97]]],
+  '8': [[[0.5, 0.06], [0.28, 0.1], [0.16, 0.25], [0.27, 0.4], [0.5, 0.47], [0.75, 0.55], [0.9, 0.72], [0.78, 0.9], [0.5, 0.95], [0.22, 0.9], [0.1, 0.72], [0.25, 0.55], [0.5, 0.47], [0.73, 0.4], [0.84, 0.25], [0.72, 0.1], [0.5, 0.06]]],
+  '9': [[[0.85, 0.18], [0.65, 0.06], [0.38, 0.06], [0.15, 0.18], [0.1, 0.36], [0.22, 0.51], [0.5, 0.55], [0.75, 0.47], [0.89, 0.32], [0.92, 0.48], [0.85, 0.7], [0.66, 0.88], [0.4, 0.96], [0.12, 0.97]]],
+};
+
+const numbers = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'].map((name, n) => ({
+  id: String(n),
+  char: String(n),
+  name,
+  // counting apples (an empty plate for zero)
+  word: n === 0 ? 'No apples' : `${name} apple${n === 1 ? '' : 's'}`,
+  emoji: n === 0 ? '🍽️' : '🍎'.repeat(n),
+  guide: NUMBER_GUIDES[String(n)],
+}));
+
 export const ALPHABETS = [
   {
     id: 'en',
@@ -599,6 +630,24 @@ export const ALPHABETS = [
       native: withWord ? `${l.nameNative}. ${l.word}` : l.nameNative,
       fallback: withWord ? `${l.name}. ${l.wordLatin}, ${l.meaning}.` : `${l.name}.`,
     }),
+  },
+  {
+    id: 'num',
+    title: 'Numbers',
+    nativeTitle: '0 – 9',
+    unit: 'number', // what the screens call each item ("letter" elsewhere)
+    speechLang: 'en',
+    dir: 'ltr',
+    font: '"Fredoka", system-ui, sans-serif',
+    traceOutline: 1.4,
+    traceWeight: 400,
+    traceThicken: -0.012,
+    theme: { main: '#3b82f6', soft: '#dbeafe', deep: '#2563eb' },
+    letters: numbers,
+    phrase: (l, withWord) => {
+      const t = withWord ? `${l.name}. ${l.word}.` : `${l.name}.`;
+      return { native: t, fallback: t };
+    },
   },
 ];
 
