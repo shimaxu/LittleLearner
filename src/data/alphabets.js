@@ -549,14 +549,14 @@ const arabic = [
 
 // Numbers 0–9 (Fredoka, like English). Hand-drawn tracing paths, fractions of the
 // digit's ink box, all starting at the top in the usual writing order:
-// 0 round to the left and back to the top · 1 up the flag, then down ·
+// 0 from the top right, leftwards over the top and all the way round · 1 up the flag, then down ·
 // 2 over the top, down the slope, along the bottom · 3 two bumps, touching the
 // middle · 4 down the slope and across, then the tall line · 5 down and round
 // the belly, then the top bar · 6 down the curve and round the loop ·
 // 7 across the top and down · 8 an S down and back up to the top ·
 // 9 round the head to the left, then down the tail.
 const NUMBER_GUIDES = {
-  '0': [[[0.5, 0.055], [0.305, 0.115], [0.162, 0.278], [0.11, 0.5], [0.162, 0.723], [0.305, 0.885], [0.5, 0.945], [0.695, 0.885], [0.838, 0.723], [0.89, 0.5], [0.838, 0.277], [0.695, 0.115], [0.5, 0.055]]],
+  '0': [[[0.776, 0.185], [0.601, 0.07], [0.399, 0.07], [0.224, 0.185], [0.123, 0.385], [0.123, 0.615], [0.224, 0.815], [0.399, 0.93], [0.601, 0.93], [0.776, 0.815], [0.877, 0.615], [0.877, 0.385], [0.776, 0.185]]],
   '1': [[[0.08, 0.33], [0.3, 0.24], [0.55, 0.14], [0.8, 0.05], [0.88, 0.12], [0.88, 0.4], [0.88, 0.7], [0.88, 0.95]]],
   '2': [[[0.1, 0.36], [0.12, 0.2], [0.25, 0.08], [0.48, 0.05], [0.7, 0.09], [0.81, 0.25], [0.77, 0.42], [0.6, 0.58], [0.35, 0.75], [0.1, 0.92], [0.3, 0.93], [0.6, 0.93], [0.95, 0.93]]],
   '3': [[[0.12, 0.2], [0.25, 0.07], [0.5, 0.04], [0.72, 0.1], [0.8, 0.25], [0.72, 0.4], [0.58, 0.47], [0.45, 0.47], [0.62, 0.5], [0.82, 0.6], [0.88, 0.77], [0.76, 0.91], [0.52, 0.96], [0.3, 0.93], [0.12, 0.8]]],
